@@ -79,17 +79,12 @@ int main(int argc, const char **argv)
   auto cameras = std::make_unique<mujoco_ros2_control::MujocoCameras>(node);
   cameras->init(mujoco_model);
 
-  // run main loop, target real-time simulation
-  mjtNum last_cam_update_sim_time = mujoco_data->time;
+  mjtNum last_cam_update = mujoco_data->time;
 
   // For fixed timestep simulation
   const double physics_dt = mujoco_model->opt.timestep; // Simulation timestep from XML (default: 0.002s)
   double sim_time_accumulator = 0.0;
   auto last_frame_wall_time = std::chrono::steady_clock::now();
-
-  // This limits how much simulation time can be processed if rendering lags
-  // (1.0 / 30.0) / physics_dt would mean capping catch-up to what a 30Hz loop would do.
-  const int max_physics_steps_per_render_frame = static_cast<int>((1.0 / 30.0) / physics_dt) + 1;
 
   while (rclcpp::ok() && !rendering->is_close_flag_raised())
   {
@@ -98,15 +93,6 @@ int main(int argc, const char **argv)
     last_frame_wall_time = current_frame_wall_time;
 
     sim_time_accumulator += elapsed_wall_since_last_frame.count();
-
-    // Clamp accumulator to prevent excessive catch-up if rendering is slow
-    if (sim_time_accumulator > max_physics_steps_per_render_frame * physics_dt) {
-        RCLCPP_WARN_THROTTLE(
-            node->get_logger(), *node->get_clock(), 1000, // Log once per second if this happens
-            "Simulation is lagging, clamping accumulated time. Accumulator: %f, Max allowed: %f",
-            sim_time_accumulator, max_physics_steps_per_render_frame * physics_dt);
-        sim_time_accumulator = max_physics_steps_per_render_frame * physics_dt;
-    }
 
     // Perform physics steps
     while (sim_time_accumulator >= physics_dt)
@@ -118,10 +104,10 @@ int main(int argc, const char **argv)
 
     // Updating cameras at ~6 Hz based on simulation time
     // TODO(eholum): Break control and rendering into separate processes
-    if (mujoco_data->time - last_cam_update_sim_time >= 1.0 / 6.0)
+    if (mujoco_data->time - last_cam_update >= 1.0 / 6.0)
     {
       cameras->update(mujoco_model, mujoco_data);
-      last_cam_update_sim_time = mujoco_data->time;
+      last_cam_update = mujoco_data->time;
     }
   }
 
