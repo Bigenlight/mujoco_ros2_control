@@ -40,6 +40,12 @@ int main(int argc, const char **argv)
   RCLCPP_INFO_STREAM(node->get_logger(), "Initializing mujoco_ros2_control node...");
   auto model_path = node->get_parameter("mujoco_model_path").as_string();
 
+  // Parameter to control V-Sync (monitor synchronization). Default : false
+  if (!node->has_parameter("enable_vsync"))
+  {
+    node->declare_parameter<bool>("enable_vsync", false);
+  }  bool enable_vsync = node->get_parameter("enable_vsync").as_bool();
+
   // load and compile model
   char error[1000] = "Could not load binary model";
   if (
@@ -74,7 +80,7 @@ int main(int argc, const char **argv)
     mju_error("Could not initialize GLFW");
   }
   auto rendering = mujoco_ros2_control::MujocoRendering::get_instance();
-  rendering->init(mujoco_model, mujoco_data);
+  rendering->init(mujoco_model, mujoco_data, enable_vsync);
   RCLCPP_INFO_STREAM(node->get_logger(), "Mujoco rendering has been successfully initialized !");
   auto cameras = std::make_unique<mujoco_ros2_control::MujocoCameras>(node);
   cameras->init(mujoco_model);
@@ -86,9 +92,9 @@ int main(int argc, const char **argv)
   double sim_time_accumulator = 0.0;
   auto last_frame_wall_time = std::chrono::steady_clock::now();
 
-  // Define a maximum number of physics steps per rendering frame to prevent "spiral of death"
+  // Define a maximum number of physics steps per rendering frame.
   // This limits how much simulation time can be processed if rendering lags significantly.
-  // (1.0 / 30.0) / physics_dt would mean capping catch-up to what a 30Hz loop would do.
+  // (1.0 / 30.0) / physics_dt mean capping catch up to what 30Hz loop would do.
   const int max_physics_steps_per_render_frame = static_cast<int>((1.0 / 30.0) / physics_dt) + 1;
 
   while (rclcpp::ok() && !rendering->is_close_flag_raised())
@@ -99,7 +105,7 @@ int main(int argc, const char **argv)
     
     sim_time_accumulator += elapsed_wall_since_last_frame.count();
 
-    // Clamp accumulator to prevent excessive catch-up if rendering is slow
+    // Clamp accumulator to prevent excessive catch up when rendering is slow
     if (sim_time_accumulator > max_physics_steps_per_render_frame * physics_dt) {
         RCLCPP_WARN_THROTTLE(
             node->get_logger(), *node->get_clock(), 1000, // Log once per second if this happens
