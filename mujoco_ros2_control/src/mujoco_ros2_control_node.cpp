@@ -44,7 +44,7 @@ int main(int argc, const char **argv)
   if (!node->has_parameter("enable_vsync"))
   {
     node->declare_parameter<bool>("enable_vsync", false);
-  }  
+  }
   bool enable_vsync = node->get_parameter("enable_vsync").as_bool();
 
   // Parameter to select simulation loop pacing method.
@@ -100,7 +100,8 @@ int main(int argc, const char **argv)
   if (use_wall_clock_pacing)
   {
     RCLCPP_INFO(node->get_logger(), "Using wall-clock pacing for simulation loop.");
-    const double physics_dt = mujoco_model->opt.timestep;  // Simulation timestep from XML (default: 0.002s)
+    const double physics_dt =
+      mujoco_model->opt.timestep;  // Simulation timestep from XML (default: 0.002s)
     double sim_time_accumulator = 0.0;
     auto last_frame_wall_time = std::chrono::steady_clock::now();
 
@@ -112,7 +113,8 @@ int main(int argc, const char **argv)
     while (rclcpp::ok() && !rendering->is_close_flag_raised())
     {
       auto current_frame_wall_time = std::chrono::steady_clock::now();
-      std::chrono::duration<double> elapsed_wall_since_last_frame = current_frame_wall_time - last_frame_wall_time;
+      std::chrono::duration<double> elapsed_wall_since_last_frame =
+        current_frame_wall_time - last_frame_wall_time;
       last_frame_wall_time = current_frame_wall_time;
 
       sim_time_accumulator += elapsed_wall_since_last_frame.count();
@@ -120,9 +122,10 @@ int main(int argc, const char **argv)
       // Clamp accumulator to prevent excessive catch up when rendering is slow
       if (sim_time_accumulator > max_physics_steps_per_render_frame * physics_dt)
       {
-        RCLCPP_WARN_THROTTLE(node->get_logger(), *node->get_clock(), 1000,  // Log once per second if this happens
-                             "Simulation is lagging; clamping accumulated time. Accumulator: %f, Max allowed: %f",
-                             sim_time_accumulator, max_physics_steps_per_render_frame * physics_dt);
+        RCLCPP_WARN_THROTTLE(
+          node->get_logger(), *node->get_clock(), 1000,  // Log once per second if this happens
+          "Simulation is lagging; clamping accumulated time. Accumulator: %f, Max allowed: %f",
+          sim_time_accumulator, max_physics_steps_per_render_frame * physics_dt);
         sim_time_accumulator = max_physics_steps_per_render_frame * physics_dt;
       }
 
@@ -165,7 +168,6 @@ int main(int argc, const char **argv)
       }
     }
   }
-
 
   rendering->close();
   cameras->close();
